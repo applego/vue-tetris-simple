@@ -3,66 +3,123 @@
 
 <head>
     <meta charset="utf-8">
-    <title>vue.js 落ち物パズルゲーム</title>
+    <title>JavaScriptで落ち物パズルゲーム</title>
     <style>
+        h1,
+        p {
+            text-align: center;
+        }
+
         .container {
             display: flex;
         }
 
-        .waku {
+        .center {
+            justify-content: center;
+        }
+
+        .wakuA {
             width: 20px;
             height: 20px;
+            border: 1px dotted silver;
+        }
+
+        .wakuB {
+            width: 12px;
+            height: 12px;
+            border: 1px solid silver;
+        }
+
+        .side {
+            width: 100px;
+            height: 100px;
+        }
+
+        input[type=number] {
+            width: 80px;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.0.7/vue.min.js"></script>
 </head>
 
 <body>
+    <script type="text/javascript" charset="utf-8" src="//asumi.shinobi.jp/encount"></script>
+    <div style="text-align: center;">
+        <div style="display: inline-block; position: relative; z-index: 9999;">
+            <script type="text/javascript" charset="utf-8" src="//asumi.shinobi.jp/fire?f=435"></script>
+            <script type="text/javascript" charset="utf-8" src="/__sys__inactive_message.js"></script>
+        </div>
+    </div>
     <div id="app">
-        <h3>vue.js 落ち物パズルゲーム</h3>
-        <p>startを押してからキーボードの矢印キーで操作します</p>
-        <input type="button" @click="startFn" value="START" v-if="gameStart == false">
-        <p v-if="gameOver">GAME OVER</p>
-        <div v-for="i in 20" class="container" v-if="gameStart">
-            <div v-for="j in 10" class="waku" :style="{ backgroundColor: ['gray', 'green'][yx[i-1][j-1]] }">
-                {{ yx[i-1][j-1] }}
+        <h1>JavaScriptで落ち物パズルゲーム</h1>
+        <div v-if="!gameStart">
+            <div>
+                <p>横:<input type="number" v-model="W" min="4" max="25"></p>
+                <p>縦:<input type="number" v-model="H" min="15" max="25"></p>
+                <p>落下間隔（秒）:<input type="number" v-model="speed" min="0.1" max="1.5" step="0.1"></p>
+                <p>キーボード操作 [移動 ←↓→] [回転↑] [スタート, ハードドロップ space] [リセット r]</p>
+                <p><input type="button" @click="startFn" value="START"></p>
             </div>
+        </div>
+        <div v-else>
+            <p><input type="button" @click="resetFn" value="RESET"></p>
+            <div class="container center">
+                <div class="side">score<br>{{ score }} </div>
+                <div>
+                    <div v-for="i in H" class="container">
+                        <div v-for="j in W" class="wakuA" :style="{ backgroundColor: color[yx[i-1][j-1]] }"></div>
+                    </div>
+                </div>
+                <div class="side">
+                    <div v-for="i in 6" class="container">
+                        <div v-for="j in 6" class="wakuB" :style="{ backgroundColor: color[yxNext[i-1][j-1]] }"></div>
+                    </div>
+                </div>
+            </div>
+            <p v-if="gameOver" style="color: red;">GAME OVER</p>
         </div>
     </div>
     <script>
-        var blocks = [
-            [[0, 0], [1, 0], [0, 1], [1, 1]],  // square
-            [[-1, 0], [0, 0], [1, 0], [2, 0]],  // tetris
-            [[-1, 0], [0, 0], [0, 1], [1, 1]],  // key1
-            [[-1, 1], [0, 1], [0, 0], [1, 0]],  // key2
-            [[-1, 0], [0, 0], [1, 0], [-1, 1]],  // L1
-            [[-1, 0], [0, 0], [1, 0], [1, 1]],  // L2
-            [[-1, 0], [0, 0], [1, 0], [0, 1]],  // T
-        ];
-
         var vm = new Vue({
             el: '#app',
             data: {
-                yx: [],
-                block: [],
+                W: 10,
+                H: 20,
+                speed: 0.5,
+                yx: [], //board
+                block: [], //今動かしているブロック
                 blockX: 0,
                 blockY: 0,
-                blockMemo: [],
+                blockType: 0,
+                blockRotate: true, //回転2通り用の右回転、左回転判断
+                blockMemo: [], //今動かしているブロックの変化前の位置
+                yxNext: [], //次のブロック表示用
+                nextType: -1,
+                score: 0,
                 timerID: null,
                 gameStart: false,
                 gameOver: false,
+                saveData: "",
+                blocks: [
+                    [[0, 0], [1, 0], [0, 1], [1, 1]],  // square 回転0通り
+                    [[-1, 0], [0, 0], [1, 0], [2, 0]],  // tetris 回転2通り
+                    [[-1, 0], [0, 0], [0, 1], [1, 1]],  // key1 回転2通り
+                    [[-1, 1], [0, 1], [0, 0], [1, 0]],  // key2 回転2通り
+                    [[-1, 0], [0, 0], [1, 0], [-1, 1]],  // L1 回転4通り
+                    [[-1, 0], [0, 0], [1, 0], [1, 1]],  // L2 回転4通り
+                    [[-1, 0], [0, 0], [1, 0], [0, 1]],  // T 回転4通り
+                ],
+                color: ["gray", "green", "green", "green", "green", "green", "green", "green"],
+                //color : ["gray", "yellow", "cyan", "blue", "orange", "green", "red", "purple"],
             },
             methods: {
                 startFn: function () {
-                    for (var i = 0; i < 20; i++) {
-                        this.yx[i] = [];
-                        for (var j = 0; j < 10; j++) {
-                            this.yx[i][j] = 0;
-                        }
-                    }
+                    this.saveData = JSON.stringify(this.$data);
+                    while (this.yx.length < this.H) this.yx.push("0".repeat(this.W).split("").map(Number)); //二次元配列初期化
+                    while (this.yxNext.length < 6) this.yxNext.push("0".repeat(6).split("").map(Number));
                     this.gameStart = true;
                     this.createFn();
-                    this.timerID = setInterval(this.fallFn, 500);
+                    this.timerID = setInterval(this.fallFn, this.speed * 1000);
                 },
                 keydownFn: function (rotate, dx, dy) {
                     if (!this.gameOver && this.checkFn(rotate, dx, dy)) this.drawFn(rotate, dx, dy);
@@ -70,64 +127,93 @@
                 checkFn: function (rotate, dx, dy) {
                     var yx = this.yx.map(v => v.slice());
                     var block = this.block.map(v => v.slice());
-                    this.blockMemo.forEach(v => {
-                        yx[v[0]][v[1]] = 0;
-                    });
-                    if (rotate) block = block.map(v => [v[1] * -1, v[0]]);
+                    this.blockMemo.forEach(v => { yx[v[0]][v[1]] = 0 });
+                    if (rotate && this.blockType != 0) {
+                        if (this.blockType <= 3 && this.blockRotate) block = block.map(v => [v[1], v[0] * -1]);
+                        else block = block.map(v => [v[1] * -1, v[0]]);
+                    }
                     var flag = block.every(v => {
                         var x = v[0] + this.blockX + dx;
                         var y = v[1] + this.blockY + dy;
-                        return (y >= 0 && y < 20 && x >= 0 && x < 10 && yx[y][x] == 0);
+                        return (y >= 0 && y < this.H && x >= 0 && x < this.W && yx[y][x] == 0);
                     });
                     return flag;
                 },
                 drawFn: function (rotate, dx, dy) {
-                    this.blockMemo.forEach(v => {
-                        this.yx[v[0]][v[1]] = 0;
-                    });
+                    this.blockMemo.forEach(v => { this.yx[v[0]][v[1]] = 0 });
                     this.blockMemo = [];
-                    if (rotate) this.block = this.block.map(v => [v[1] * -1, v[0]]);
+                    if (rotate && this.blockType != 0) {
+                        if (this.blockType <= 3 && this.blockRotate) this.block = this.block.map(v => [v[1], v[0] * -1]);
+                        else this.block = this.block.map(v => [v[1] * -1, v[0]]);
+                        this.blockRotate = !this.blockRotate;
+                    }
                     this.blockX += dx;
                     this.blockY += dy;
                     this.block.forEach(v => {
                         if (this.yx[v[1] + this.blockY][v[0] + this.blockX] != 0) this.gameOver = true;
-                        this.yx[v[1] + this.blockY][v[0] + this.blockX] = 1;
+                        this.yx[v[1] + this.blockY][v[0] + this.blockX] = this.blockType + 1;
                         this.blockMemo.push([v[1] + this.blockY, v[0] + this.blockX]);
                     });
                     if (this.gameOver) clearInterval(this.timerID);
                     this.yx.push();
                 },
                 createFn: function () {
+                    if (this.block.length != 0) this.deleteFn();
                     this.blockMemo = [];
-                    this.blockX = 4;
+                    this.blockType = (this.nextType == -1) ? Math.floor(Math.random() * this.blocks.length) : this.nextType;
+                    this.nextType = Math.floor(Math.random() * this.blocks.length);
+                    this.nextDrawFn();
+                    this.blockX = Math.ceil(this.W / 2) - 1;
                     this.blockY = 1;
-                    this.block = blocks[Math.floor(Math.random() * 7)].map(v => [v[0], v[1]]);
+                    this.blockRotate = true;
+                    this.block = this.blocks[this.blockType].map(v => [v[0], v[1]]);
                     this.drawFn(false, 0, 0);
                 },
                 deleteFn: function () {
-                    this.yx = this.yx.filter(v => (v.join("") != "1111111111"));
-                    while (this.yx.length < 20) {
-                        this.yx.unshift([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-                    }
+                    this.yx = this.yx.filter(v => /0/.test(v.join("")));
+                    this.score += (this.H - this.yx.length) * 100;
+                    while (this.yx.length < this.H) this.yx.unshift("0".repeat(this.W).split("").map(Number));
                 },
                 fallFn: function () {
-                    if (this.checkFn(false, 0, 1)) {
-                        this.drawFn(false, 0, 1);
-                    } else {
-                        this.deleteFn();
-                        this.createFn();
-                    }
-                }
+                    if (this.checkFn(false, 0, 1)) this.drawFn(false, 0, 1);
+                    else this.createFn();
+                },
+                hardDropFn: function () {
+                    if (this.gameOver) return;
+                    var i = 0;
+                    while (this.checkFn(false, 0, i)) i++;
+                    if (i != 0) this.drawFn(false, 0, i - 1);
+                },
+                resetFn: function () {
+                    clearInterval(this.timerID);
+                    var obj = JSON.parse(this.saveData);
+                    for (var k in obj) this[k] = obj[k];
+                },
+                nextDrawFn: function () {
+                    this.yxNext = [];
+                    while (this.yxNext.length < 6) this.yxNext.push("0".repeat(6).split("").map(Number));
+                    this.blocks[this.nextType].forEach(v => {
+                        this.yxNext[v[1] + 2][v[0] + 2] = this.nextType + 1;
+                    });
+                },
             },
         });
 
         document.onkeydown = function (e) {
-            if (e.keyCode == 38) vm.keydownFn(true, 0, 0); //up
-            else if (e.keyCode == 37) vm.keydownFn(false, -1, 0); //left
-            else if (e.keyCode == 40) vm.keydownFn(false, 0, 1); //down
-            else if (e.keyCode == 39) vm.keydownFn(false, 1, 0); //right
+            if (e.keyCode == 38) vm.keydownFn(true, 0, 0);  //up
+            else if (e.keyCode == 37) vm.keydownFn(false, -1, 0);  //left
+            else if (e.keyCode == 40) vm.keydownFn(false, 0, 1);  //down
+            else if (e.keyCode == 39) vm.keydownFn(false, 1, 0);  //right
+            else if (e.keyCode == 32 && vm.gameStart) vm.hardDropFn();  //space
+            else if (e.keyCode == 32 && !vm.gameStart) vm.startFn();
+            else if (e.keyCode == 82 && vm.gameStart) vm.resetFn();  //r
         };
     </script>
+    <div style="text-align: center;">
+        <div style="display: inline-block; position: relative; z-index: 9999;">
+            <script type="text/javascript" charset="utf-8" src="//asumi.shinobi.jp/fire?f=434"></script>
+        </div>
+    </div>
 </body>
 
 </html>
